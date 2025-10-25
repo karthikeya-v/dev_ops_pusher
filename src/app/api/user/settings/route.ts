@@ -1,5 +1,4 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { createClient } from '@/lib/supabase-server'
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -7,7 +6,7 @@ export const dynamic = 'force-dynamic'
 // GET /api/user/settings - Retrieve user settings
 export async function GET() {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = createClient()
 
     // Check if user is authenticated
     const {
@@ -52,7 +51,7 @@ export async function GET() {
 // POST /api/user/settings - Create or update user settings
 export async function POST(request: Request) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = createClient()
 
     // Check if user is authenticated
     const {
