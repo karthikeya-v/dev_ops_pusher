@@ -1,5 +1,5 @@
-import { Key, Cloud, AlertCircle, CheckCircle2, ExternalLink, Cpu } from 'lucide-react'
-import { useState } from 'react'
+import { Key, Cloud, AlertCircle, CheckCircle2, ExternalLink, Cpu, Save } from 'lucide-react'
+import { useState, useEffect } from 'react'
 
 interface ConfigPanelProps {
   selectedModel: string
@@ -18,25 +18,27 @@ const AI_MODELS = [
 ]
 
 export default function ConfigPanel({ selectedModel, onModelChange }: ConfigPanelProps) {
-  const [config, setConfig] = useState({
-    openRouterKey: '',
-    azureOrg: '',
-    azureProject: '',
-    azurePAT: ''
-  })
+  const [openRouterKey, setOpenRouterKey] = useState('')
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
 
-  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
+  // Load API key from localStorage on mount
+  useEffect(() => {
+    const savedKey = localStorage.getItem('openrouter_api_key')
+    if (savedKey) {
+      setOpenRouterKey(savedKey)
+    }
+  }, [])
 
-  const isConfigured = config.openRouterKey && config.azureOrg && config.azureProject && config.azurePAT
-
-  const handleTest = async () => {
-    setTestStatus('testing')
-
-    // Simulate API test
+  const handleSaveApiKey = () => {
+    setSaveStatus('saving')
+    localStorage.setItem('openrouter_api_key', openRouterKey)
     setTimeout(() => {
-      setTestStatus('success')
-    }, 2000)
+      setSaveStatus('saved')
+      setTimeout(() => setSaveStatus('idle'), 2000)
+    }, 500)
   }
+
+  const isKeyConfigured = openRouterKey.trim().length > 0
 
   return (
     <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700">
@@ -74,12 +76,12 @@ export default function ConfigPanel({ selectedModel, onModelChange }: ConfigPane
         <div>
           <div className="flex items-center space-x-2 mb-3">
             <Key className="w-5 h-5 text-blue-400" />
-            <h3 className="text-lg font-semibold">OpenRouter API</h3>
+            <h3 className="text-lg font-semibold">OpenRouter API Key</h3>
           </div>
           <div className="space-y-3">
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                API Key (Set in .env.local)
+                API Key
                 <a
                   href="https://openrouter.ai/keys"
                   target="_blank"
@@ -89,16 +91,37 @@ export default function ConfigPanel({ selectedModel, onModelChange }: ConfigPane
                   Get Key <ExternalLink className="w-3 h-3 ml-1" />
                 </a>
               </label>
-              <input
-                type="password"
-                value={config.openRouterKey}
-                onChange={(e) => setConfig({ ...config, openRouterKey: e.target.value })}
-                placeholder="Set in environment variables"
-                disabled
-                className="w-full bg-slate-900/30 border border-slate-700 rounded-lg p-3 text-slate-500 cursor-not-allowed"
-              />
-              <p className="mt-1 text-xs text-slate-400">
-                Configure in .env.local: OPENROUTER_API_KEY
+              <div className="flex space-x-2">
+                <input
+                  type="password"
+                  value={openRouterKey}
+                  onChange={(e) => setOpenRouterKey(e.target.value)}
+                  placeholder="sk-or-v1-..."
+                  className="flex-1 bg-slate-900/50 border border-slate-600 rounded-lg p-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={handleSaveApiKey}
+                  disabled={!openRouterKey.trim() || saveStatus === 'saving'}
+                  className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-3 rounded-lg transition-colors"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved!' : 'Save'}</span>
+                </button>
+              </div>
+              {isKeyConfigured && (
+                <p className="mt-2 text-xs text-green-400 flex items-center space-x-1">
+                  <CheckCircle2 className="w-3 h-3" />
+                  <span>API Key configured and saved</span>
+                </p>
+              )}
+              {!isKeyConfigured && (
+                <p className="mt-2 text-xs text-yellow-400 flex items-center space-x-1">
+                  <AlertCircle className="w-3 h-3" />
+                  <span>Please add your OpenRouter API key to use AI generation</span>
+                </p>
+              )}
+              <p className="mt-2 text-xs text-slate-400">
+                Your API key is stored locally in your browser and sent directly to OpenRouter.
               </p>
             </div>
           </div>
@@ -111,70 +134,24 @@ export default function ConfigPanel({ selectedModel, onModelChange }: ConfigPane
             <h3 className="text-lg font-semibold">Azure DevOps</h3>
           </div>
           <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Organization Name (Set in .env.local)
-              </label>
-              <input
-                type="text"
-                value={config.azureOrg}
-                onChange={(e) => setConfig({ ...config, azureOrg: e.target.value })}
-                placeholder="Set in environment variables"
-                disabled
-                className="w-full bg-slate-900/30 border border-slate-700 rounded-lg p-3 text-slate-500 cursor-not-allowed"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Project Name (Set in .env.local)
-              </label>
-              <input
-                type="text"
-                value={config.azureProject}
-                onChange={(e) => setConfig({ ...config, azureProject: e.target.value })}
-                placeholder="Set in environment variables"
-                disabled
-                className="w-full bg-slate-900/30 border border-slate-700 rounded-lg p-3 text-slate-500 cursor-not-allowed"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Personal Access Token (PAT)
-                <a
-                  href="https://learn.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="ml-2 text-blue-400 hover:text-blue-300 inline-flex items-center text-xs"
-                >
-                  How to create <ExternalLink className="w-3 h-3 ml-1" />
-                </a>
-              </label>
-              <input
-                type="password"
-                value={config.azurePAT}
-                onChange={(e) => setConfig({ ...config, azurePAT: e.target.value })}
-                placeholder="Set in environment variables"
-                disabled
-                className="w-full bg-slate-900/30 border border-slate-700 rounded-lg p-3 text-slate-500 cursor-not-allowed"
-              />
-            </div>
+            <p className="text-sm text-slate-400">
+              Azure DevOps credentials are configured in environment variables for security.
+              Contact your administrator to update these settings.
+            </p>
           </div>
         </div>
 
         {/* Help Text */}
         <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-          <h4 className="font-semibold mb-2 text-blue-300">Environment Variables</h4>
-          <p className="text-sm text-slate-300 mb-2">
-            Configure these in your <code className="bg-slate-900/50 px-2 py-1 rounded text-xs">.env.local</code> file:
-          </p>
-          <pre className="text-xs bg-slate-900/50 p-3 rounded overflow-x-auto text-slate-300">
-{`OPENROUTER_API_KEY=sk-or-...
-AZURE_DEVOPS_ORG=your_org
-AZURE_DEVOPS_PROJECT=your_project
-AZURE_DEVOPS_PAT=your_pat`}
-          </pre>
+          <h4 className="font-semibold mb-2 text-blue-300">How to get OpenRouter API Key</h4>
+          <ol className="text-sm text-slate-300 space-y-1 list-decimal list-inside">
+            <li>Visit <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">openrouter.ai/keys</a></li>
+            <li>Sign up or log in to your account</li>
+            <li>Create a new API key</li>
+            <li>Add credits to your account (pay-as-you-go)</li>
+            <li>Copy the key and paste it above</li>
+            <li>Click "Save" to store it securely in your browser</li>
+          </ol>
         </div>
       </div>
     </div>

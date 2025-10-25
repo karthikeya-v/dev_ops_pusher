@@ -80,6 +80,15 @@ export default function Home() {
       return
     }
 
+    // Get API key from localStorage
+    const apiKey = localStorage.getItem('openrouter_api_key')
+    if (!apiKey || apiKey.trim() === '') {
+      setGenerationStatus('error')
+      setStatusMessage('OpenRouter API key not configured. Please add your API key in Settings.')
+      setShowConfig(true)
+      return
+    }
+
     setIsGenerating(true)
     setGenerationStatus('generating')
     setStatusMessage('Generating work items with AI...')
@@ -88,7 +97,11 @@ export default function Home() {
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: promptToUse, model: selectedModel })
+        body: JSON.stringify({
+          prompt: promptToUse,
+          model: selectedModel,
+          apiKey: apiKey
+        })
       })
 
       const data = await response.json()
