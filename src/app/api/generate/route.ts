@@ -1,22 +1,54 @@
 import { NextResponse } from 'next/server'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 import OpenAI from 'openai'
+
+export const dynamic = 'force-dynamic'
 
 export async function POST(request: Request) {
   try {
-    const { prompt, model = 'anthropic/claude-3.5-sonnet', apiKey } = await request.json()
+    const supabase = createRouteHandlerClient({ cookies })
+
+    // Check if user is authenticated
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { prompt, model } = await request.json()
 
     if (!prompt) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 })
     }
 
-    if (!apiKey || apiKey.trim() === '') {
+    // Fetch user settings from database
+    const { data: settings, error: settingsError } = await supabase
+      .from('user_settings')
+      .select('openrouter_api_key, default_model')
+      .eq('user_id', session.user.id)
+      .single()
+
+    if (settingsError || !settings) {
       return NextResponse.json(
-        { error: 'OpenRouter API key not provided. Please add your API key in the settings.' },
+        { error: 'Please configure your OpenRouter API key in Settings before generating work items.' },
         { status: 400 }
       )
     }
 
-    console.log('Using OpenRouter model:', model)
+    const apiKey = settings.openrouter_api_key
+    const modelToUse = model || settings.default_model || 'anthropic/claude-3.5-sonnet'
+
+    if (!apiKey || apiKey.trim() === '') {
+      return NextResponse.json(
+        { error: 'OpenRouter API key not configured. Please add your API key in Settings.' },
+        { status: 400 }
+      )
+    }
+
+    console.log('Using OpenRouter model:', modelToUse)
     console.log('API Key present:', !!apiKey)
 
     // Initialize OpenAI client with OpenRouter
@@ -62,7 +94,7 @@ Example format:
     console.log('Sending request to OpenRouter...')
 
     const completion = await openai.chat.completions.create({
-      model: model,
+      model: modelToUse,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: prompt }

@@ -1,24 +1,53 @@
 import { NextResponse } from 'next/server'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 import axios from 'axios'
+
+export const dynamic = 'force-dynamic'
 
 export async function POST(request: Request) {
   try {
+    const supabase = createRouteHandlerClient({ cookies })
+
+    // Check if user is authenticated
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { workItems } = await request.json()
 
     if (!workItems || !Array.isArray(workItems) || workItems.length === 0) {
       return NextResponse.json({ error: 'Work items array is required' }, { status: 400 })
     }
 
-    const organization = process.env.AZURE_DEVOPS_ORG
-    const project = process.env.AZURE_DEVOPS_PROJECT
-    const pat = process.env.AZURE_DEVOPS_PAT
+    // Fetch user settings from database
+    const { data: settings, error: settingsError } = await supabase
+      .from('user_settings')
+      .select('azure_devops_org, azure_devops_project, azure_devops_pat')
+      .eq('user_id', session.user.id)
+      .single()
+
+    if (settingsError || !settings) {
+      return NextResponse.json(
+        { error: 'Please configure your Azure DevOps credentials in Settings before pushing work items.' },
+        { status: 400 }
+      )
+    }
+
+    const organization = settings.azure_devops_org
+    const project = settings.azure_devops_project
+    const pat = settings.azure_devops_pat
 
     if (!organization || !project || !pat) {
       return NextResponse.json(
         {
-          error: 'Azure DevOps not configured. Please set AZURE_DEVOPS_ORG, AZURE_DEVOPS_PROJECT, and AZURE_DEVOPS_PAT in your environment variables.'
+          error: 'Azure DevOps not fully configured. Please set your Organization, Project, and PAT in Settings.'
         },
-        { status: 500 }
+        { status: 400 }
       )
     }
 

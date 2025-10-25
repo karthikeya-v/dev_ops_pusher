@@ -20,7 +20,6 @@ import {
 } from 'lucide-react'
 import WorkItemCard from '@/components/WorkItemCard'
 import PromptBuilder from '@/components/PromptBuilder'
-import ConfigPanel from '@/components/ConfigPanel'
 
 export interface WorkItem {
   id?: string
@@ -40,7 +39,6 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [workItems, setWorkItems] = useState<WorkItem[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
-  const [showConfig, setShowConfig] = useState(false)
   const [prompt, setPrompt] = useState('')
   const [selectedModel, setSelectedModel] = useState('anthropic/claude-3.5-sonnet')
   const [generationStatus, setGenerationStatus] = useState<'idle' | 'generating' | 'success' | 'error'>('idle')
@@ -80,15 +78,6 @@ export default function Home() {
       return
     }
 
-    // Get API key from localStorage
-    const apiKey = localStorage.getItem('openrouter_api_key')
-    if (!apiKey || apiKey.trim() === '') {
-      setGenerationStatus('error')
-      setStatusMessage('OpenRouter API key not configured. Please add your API key in Settings.')
-      setShowConfig(true)
-      return
-    }
-
     setIsGenerating(true)
     setGenerationStatus('generating')
     setStatusMessage('Generating work items with AI...')
@@ -100,7 +89,6 @@ export default function Home() {
         body: JSON.stringify({
           prompt: promptToUse,
           model: selectedModel,
-          apiKey: apiKey
         })
       })
 
@@ -225,11 +213,11 @@ export default function Home() {
                 </div>
               )}
               <button
-                onClick={() => setShowConfig(!showConfig)}
+                onClick={() => router.push('/settings')}
                 className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg transition-colors"
               >
                 <Settings className="w-4 h-4" />
-                <span>Configure</span>
+                <span>Settings</span>
               </button>
               <button
                 onClick={handleLogout}
@@ -244,13 +232,6 @@ export default function Home() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Configuration Panel */}
-        {showConfig && (
-          <div className="mb-8">
-            <ConfigPanel selectedModel={selectedModel} onModelChange={setSelectedModel} />
-          </div>
-        )}
-
         {/* Status Message */}
         {generationStatus !== 'idle' && (
           <div className={`mb-6 p-4 rounded-lg flex items-center space-x-3 ${
