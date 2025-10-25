@@ -3,17 +3,16 @@ import OpenAI from 'openai'
 
 export async function POST(request: Request) {
   try {
-    const { prompt, model = 'anthropic/claude-3.5-sonnet' } = await request.json()
+    const { prompt, model = 'anthropic/claude-3.5-sonnet', apiKey } = await request.json()
 
     if (!prompt) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 })
     }
 
-    const apiKey = process.env.OPENROUTER_API_KEY
-    if (!apiKey) {
+    if (!apiKey || apiKey.trim() === '') {
       return NextResponse.json(
-        { error: 'OpenRouter API key not configured. Please set OPENROUTER_API_KEY in your environment variables.' },
-        { status: 500 }
+        { error: 'OpenRouter API key not provided. Please add your API key in the settings.' },
+        { status: 400 }
       )
     }
 
