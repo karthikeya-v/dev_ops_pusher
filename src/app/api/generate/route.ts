@@ -3,7 +3,7 @@ import OpenAI from 'openai'
 
 export async function POST(request: Request) {
   try {
-    const { prompt } = await request.json()
+    const { prompt, model = 'anthropic/claude-3.5-sonnet' } = await request.json()
 
     if (!prompt) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 })
@@ -16,6 +16,9 @@ export async function POST(request: Request) {
         { status: 500 }
       )
     }
+
+    console.log('Using OpenRouter model:', model)
+    console.log('API Key present:', !!apiKey)
 
     // Initialize OpenAI client with OpenRouter
     const openai = new OpenAI({
@@ -57,8 +60,10 @@ Example format:
   }
 ]`
 
+    console.log('Sending request to OpenRouter...')
+
     const completion = await openai.chat.completions.create({
-      model: 'anthropic/claude-3.5-sonnet', // Using Claude on OpenRouter
+      model: model,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: prompt }
@@ -67,11 +72,15 @@ Example format:
       max_tokens: 4000
     })
 
+    console.log('Received response from OpenRouter')
+
     const response = completion.choices[0]?.message?.content
 
     if (!response) {
       throw new Error('No response from AI')
     }
+
+    console.log('AI Response length:', response.length)
 
     // Parse the JSON response
     let workItems
@@ -89,11 +98,17 @@ Example format:
       throw new Error('AI response is not an array')
     }
 
+    console.log('Successfully generated', workItems.length, 'work items')
+
     return NextResponse.json({ workItems })
   } catch (error: any) {
     console.error('Error generating work items:', error)
+    console.error('Error details:', error.response?.data || error.message)
     return NextResponse.json(
-      { error: error.message || 'Failed to generate work items' },
+      {
+        error: error.message || 'Failed to generate work items',
+        details: error.response?.data || error.toString()
+      },
       { status: 500 }
     )
   }
