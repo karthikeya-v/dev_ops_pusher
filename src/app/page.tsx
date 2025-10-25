@@ -1,6 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 import {
   Sparkles,
   FileUp,
@@ -12,7 +14,9 @@ import {
   XCircle,
   Lightbulb,
   Layers,
-  Upload
+  Upload,
+  LogOut,
+  User
 } from 'lucide-react'
 import WorkItemCard from '@/components/WorkItemCard'
 import PromptBuilder from '@/components/PromptBuilder'
@@ -31,12 +35,43 @@ export interface WorkItem {
 }
 
 export default function Home() {
+  const router = useRouter()
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
   const [workItems, setWorkItems] = useState<WorkItem[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
   const [showConfig, setShowConfig] = useState(false)
   const [prompt, setPrompt] = useState('')
+  const [selectedModel, setSelectedModel] = useState('anthropic/claude-3.5-sonnet')
   const [generationStatus, setGenerationStatus] = useState<'idle' | 'generating' | 'success' | 'error'>('idle')
   const [statusMessage, setStatusMessage] = useState('')
+
+  useEffect(() => {
+    checkUser()
+  }, [])
+
+  const checkUser = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session) {
+        router.push('/login')
+        return
+      }
+
+      setUser(session.user)
+    } catch (error) {
+      console.error('Error checking user:', error)
+      router.push('/login')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
 
   const handleGenerate = async (customPrompt?: string) => {
     const promptToUse = customPrompt || prompt
@@ -53,21 +88,22 @@ export default function Home() {
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: promptToUse })
+        body: JSON.stringify({ prompt: promptToUse, model: selectedModel })
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        throw new Error('Failed to generate work items')
+        throw new Error(data.error || 'Failed to generate work items')
       }
 
-      const data = await response.json()
       setWorkItems(data.workItems)
       setGenerationStatus('success')
       setStatusMessage(`Successfully generated ${data.workItems.length} work items`)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating work items:', error)
       setGenerationStatus('error')
-      setStatusMessage('Failed to generate work items. Please check your API configuration.')
+      setStatusMessage(error.message || 'Failed to generate work items. Please check your API configuration and console for details.')
     } finally {
       setIsGenerating(false)
     }
@@ -143,6 +179,14 @@ export default function Home() {
     setWorkItems(newItems)
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+      </div>
+    )
+  }
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
       {/* Header */}
@@ -160,13 +204,28 @@ export default function Home() {
                 <p className="text-slate-400 text-sm">Generate & Push Work Items to Azure DevOps</p>
               </div>
             </div>
-            <button
-              onClick={() => setShowConfig(!showConfig)}
-              className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg transition-colors"
-            >
-              <Settings className="w-4 h-4" />
-              <span>Configure</span>
-            </button>
+            <div className="flex items-center space-x-4">
+              {user && (
+                <div className="flex items-center space-x-2 text-sm text-slate-400">
+                  <User className="w-4 h-4" />
+                  <span>{user.email}</span>
+                </div>
+              )}
+              <button
+                onClick={() => setShowConfig(!showConfig)}
+                className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg transition-colors"
+              >
+                <Settings className="w-4 h-4" />
+                <span>Configure</span>
+              </button>
+              <button
+                onClick={handleLogout}
+                className="flex items-center space-x-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 px-4 py-2 rounded-lg transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Logout</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -175,7 +234,7 @@ export default function Home() {
         {/* Configuration Panel */}
         {showConfig && (
           <div className="mb-8">
-            <ConfigPanel />
+            <ConfigPanel selectedModel={selectedModel} onModelChange={setSelectedModel} />
           </div>
         )}
 
@@ -216,7 +275,7 @@ Example: 'Create 5 user stories for an e-commerce checkout flow with payment int
             <div className="flex items-center justify-between mt-4">
               <div className="flex items-center space-x-2 text-sm text-slate-400">
                 <Sparkles className="w-4 h-4" />
-                <span>Powered by OpenRouter AI</span>
+                <span>Using: {selectedModel.split('/')[1].replace(/-/g, ' ').toUpperCase()}</span>
               </div>
               <button
                 onClick={() => handleGenerate()}
